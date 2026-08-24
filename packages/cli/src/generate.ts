@@ -1,6 +1,6 @@
 import { dirname, relative, resolve } from "node:path";
 
-import type { Language, SetupAnswers } from "./types";
+import type { Adapter, Language, SetupAnswers } from "./types";
 
 function ext(language: Language): string {
   return language === "typescript" ? ".ts" : ".js";
@@ -41,18 +41,27 @@ async function resolveChatpackUser(request${type}) {
 `;
 }
 
+const adapterConstructors: Record<Adapter, { packageName: string; exportName: string }> = {
+  memory: { packageName: "@chatpack/adapter-memory", exportName: "memoryAdapter" },
+  drizzle: { packageName: "@chatpack/adapter-drizzle", exportName: "drizzleAdapter" },
+  sqlite: { packageName: "@chatpack/adapter-sqlite", exportName: "sqliteAdapter" },
+  turso: { packageName: "@chatpack/adapter-turso", exportName: "tursoAdapter" },
+  supabase: { packageName: "@chatpack/adapter-supabase", exportName: "supabaseAdapter" },
+};
+
 function storageBlock(answers: SetupAnswers): { imports: string; value: string } {
+  const adapter = adapterConstructors[answers.adapter];
   if (answers.adapter === "memory") {
     return {
-      imports: 'import { memoryAdapter } from "@chatpack/adapter-memory";',
-      value: "memoryAdapter()",
+      imports: `import { ${adapter.exportName} } from "${adapter.packageName}";`,
+      value: `${adapter.exportName}()`,
     };
   }
-  if (!answers.database) throw new Error("Drizzle setup requires a database module and export.");
+  if (!answers.database) throw new Error("Storage setup requires a database module and export.");
   return {
-    imports: `import { drizzleAdapter } from "@chatpack/adapter-drizzle";
+    imports: `import { ${adapter.exportName} } from "${adapter.packageName}";
 import { ${answers.database.exportName} as db } from "${answers.database.path}";`,
-    value: "drizzleAdapter(db)",
+    value: `${adapter.exportName}(db)`,
   };
 }
 
@@ -181,8 +190,9 @@ export function schemaPath(sourceRoot: string, language: Language): string {
   return resolve(sourceRoot, "db", `chatpack.schema${ext(language)}`);
 }
 
-export function renderSchema(): string {
+export function renderSchema(adapter: "drizzle" | "sqlite" | "turso" = "drizzle"): string {
+  const packageName = adapterConstructors[adapter].packageName;
   return `// Add this module to your Drizzle schema configuration.
-export * from "@chatpack/adapter-drizzle";
+export * from "${packageName}";
 `;
 }

@@ -81,4 +81,23 @@ describe("generated setup", () => {
     expect(source).not.toContain("request: Request");
     expect(() => parseSource("chatpack.server.js", source)).not.toThrow();
   });
+
+  it.each([
+    ["drizzle", "drizzleAdapter", "@chatpack/adapter-drizzle"],
+    ["sqlite", "sqliteAdapter", "@chatpack/adapter-sqlite"],
+    ["turso", "tursoAdapter", "@chatpack/adapter-turso"],
+    ["supabase", "supabaseAdapter", "@chatpack/adapter-supabase"],
+  ] as const)("generates %s storage setup", (adapter, constructor, packageName) => {
+    const source = renderServer(
+      {
+        ...answers,
+        adapter,
+        database: { path: "./db.js", exportName: "db" },
+      },
+      "typescript",
+    );
+    expect(source).toContain(`import { ${constructor} } from "${packageName}";`);
+    expect(source).toContain(`${constructor}(db)`);
+    expect(() => parseSource("chatpack.server.ts", source)).not.toThrow();
+  });
 });

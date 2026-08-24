@@ -54,6 +54,24 @@ npx @chatpack/cli init \
   --yes
 ```
 
+Existing applications can also use `sqlite`, `turso`, or `supabase`. Supply
+`--db-path` and `--db-export` for the caller-created Drizzle database or
+server-side Supabase client:
+
+```sh
+npx @chatpack/cli init \
+  --framework next \
+  --adapter supabase \
+  --db-path src/lib/supabase.ts \
+  --db-export supabase \
+  --package-manager pnpm \
+  --yes
+```
+
+SQLite and Turso generate a Drizzle schema re-export. Supabase requires its
+package migration to be applied before the generated server handles requests.
+Complete starters currently use Neon/Drizzle and do not accept another adapter.
+
 The CLI detects the framework, package manager, language, aliases, existing Chatpack setup, database hints, and authentication hints. Next.js receives a catch-all route. Hono and Express receive focused handler integrations. Use `--client` to generate client wiring.
 
 ## Safety

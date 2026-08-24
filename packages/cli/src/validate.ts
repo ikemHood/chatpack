@@ -49,10 +49,10 @@ export function validatePlan(plan: SetupPlan): string[] {
   }
   if (
     plan.inspection.mode === "existing" &&
-    plan.answers.adapter === "drizzle" &&
+    plan.answers.adapter !== "memory" &&
     !plan.answers.database
   )
-    errors.push("Drizzle adapter has no confirmed database export.");
+    errors.push(`${plan.answers.adapter} adapter has no confirmed database export.`);
   return errors;
 }
 

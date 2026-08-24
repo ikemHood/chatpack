@@ -5,7 +5,7 @@ import type { Adapter, AuthProvider, CliArgs, Framework, PackageManager } from "
 export type { CliArgs } from "./types";
 
 const frameworks = new Set<Framework>(["next", "hono", "express", "web"]);
-const adapters = new Set<Adapter>(["memory", "drizzle"]);
+const adapters = new Set<Adapter>(["memory", "drizzle", "sqlite", "turso", "supabase"]);
 const packageManagers = new Set<PackageManager>(["npm", "pnpm", "yarn", "bun"]);
 const authProviders = new Set<AuthProvider>(["better-auth", "authjs", "auth0"]);
 const valueOptions = new Set([
@@ -137,12 +137,13 @@ Usage:
 Options:
   --cwd <path>                         Project directory
   --framework <next|hono|express|web> Framework target
-  --adapter <memory|drizzle>          Storage adapter
+  --adapter <memory|drizzle|sqlite|turso|supabase>
+                                      Storage adapter
   --auth-path <path>                   Confirmed auth resolver module
   --auth-export <name>                 Confirmed auth resolver export
   --auth-id-property <name>            User id property (default: id)
-  --db-path <path>                     Drizzle database module
-  --db-export <name>                   Drizzle database export
+  --db-path <path>                     Database/client module
+  --db-export <name>                   Database/client export
   --package-manager <name>             npm, pnpm, yarn, or bun
   --auth-provider <name>               better-auth, authjs, or auth0 (Next starters)
   --name <package-name>                Package name for a new starter

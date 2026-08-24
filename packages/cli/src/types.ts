@@ -1,7 +1,7 @@
 import type { PackageJson } from "./package-json";
 
 export type Framework = "next" | "hono" | "express" | "web";
-export type Adapter = "memory" | "drizzle";
+export type Adapter = "memory" | "drizzle" | "sqlite" | "turso" | "supabase";
 export type AuthProvider = "better-auth" | "authjs" | "auth0";
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 export type Language = "typescript" | "javascript";

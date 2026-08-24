@@ -46,6 +46,20 @@ function dependencyExists(inspection: ProjectInspection, name: string): boolean 
   return Boolean(allDependencies(inspection.packageJson)[name]);
 }
 
+const adapterPackages: Record<Adapter, string> = {
+  memory: "@chatpack/adapter-memory",
+  drizzle: "@chatpack/adapter-drizzle",
+  sqlite: "@chatpack/adapter-sqlite",
+  turso: "@chatpack/adapter-turso",
+  supabase: "@chatpack/adapter-supabase",
+};
+
+function adapterFromSource(source: string): Adapter | undefined {
+  return (Object.entries(adapterPackages) as Array<[Adapter, string]>).find(([, packageName]) =>
+    source.includes(packageName),
+  )?.[0];
+}
+
 function requireModulePath(root: string, path: string, label: string): string {
   const target = resolve(root, path);
   const candidates = [
@@ -91,15 +105,20 @@ async function chooseAdapter(inspection: ProjectInspection, args: CliArgs): Prom
   if (inspection.chatpackConfig) {
     const source =
       inspection.files.find((file) => file.path === inspection.chatpackConfig?.path)?.content ?? "";
-    if (source.includes("@chatpack/adapter-drizzle")) return "drizzle";
-    if (source.includes("@chatpack/adapter-memory")) return "memory";
+    const detected = adapterFromSource(source);
+    if (detected) return detected;
   }
   if (args.yes)
-    throw new Error("Storage adapter is required. Supply --adapter memory or --adapter drizzle.");
+    throw new Error(
+      "Storage adapter is required. Supply --adapter memory, drizzle, sqlite, turso, or supabase.",
+    );
   return select(
     "Choose a storage adapter",
     [
       { value: "drizzle", label: "Drizzle", hint: "Persistent database storage" },
+      { value: "sqlite", label: "SQLite", hint: "Durable local or single-node storage" },
+      { value: "turso", label: "Turso", hint: "Drizzle/libSQL remote or local storage" },
+      { value: "supabase", label: "Supabase", hint: "Server-side Postgres storage" },
       { value: "memory", label: "Memory", hint: "Development and tests only" },
     ] as const,
     "drizzle",
@@ -188,14 +207,22 @@ async function chooseDatabase(
       exportName: args.dbExport,
     };
   }
-  if (args.yes) throw new Error("Drizzle setup requires --db-path and --db-export.");
+  const label =
+    adapter === "supabase"
+      ? "Supabase client"
+      : adapter === "sqlite"
+        ? "SQLite database"
+        : adapter === "turso"
+          ? "Turso database"
+          : "Drizzle database";
+  if (args.yes) throw new Error(`${label} setup requires --db-path and --db-export.`);
   const candidate =
     inspection.databaseCandidates.length === 1 ? inspection.databaseCandidates[0] : undefined;
   const path = await prompt(
-    "Drizzle database module path",
+    `${label} module path`,
     candidate ? relative(inspection.packageRoot, candidate.path) : "src/lib/db",
   );
-  const exportName = await prompt("Drizzle database export", candidate?.exportName ?? "db");
+  const exportName = await prompt(`${label} export`, candidate?.exportName ?? "db");
   const target = requireModulePath(inspection.packageRoot, path, "Database");
   return {
     path: importPath(serverFile, target, useRuntimeExtension),
@@ -316,7 +343,11 @@ function planFrameworkActions(
 }
 
 export async function makePlan(inspection: ProjectInspection, args: CliArgs): Promise<SetupPlan> {
-  if (inspection.mode === "starter") return makeStarterPlan(inspection, args);
+  if (inspection.mode === "starter") {
+    if (args.adapter && args.adapter !== "drizzle" && args.adapter !== "memory")
+      throw new Error("Starter projects currently require --adapter drizzle.");
+    return makeStarterPlan(inspection, args);
+  }
   if (args.authProvider || args.name) {
     throw new Error("--auth-provider and --name are only available for new starter projects.");
   }
@@ -349,10 +380,8 @@ export async function makePlan(inspection: ProjectInspection, args: CliArgs): Pr
   const dependencies: string[] = [];
 
   if (!dependencyExists(inspection, "@chatpack/core")) dependencies.push("@chatpack/core");
-  if (adapter === "memory" && !dependencyExists(inspection, "@chatpack/adapter-memory"))
-    dependencies.push("@chatpack/adapter-memory");
-  if (adapter === "drizzle" && !dependencyExists(inspection, "@chatpack/adapter-drizzle"))
-    dependencies.push("@chatpack/adapter-drizzle");
+  if (!dependencyExists(inspection, adapterPackages[adapter]))
+    dependencies.push(adapterPackages[adapter]);
   if (framework === "next" && !dependencyExists(inspection, "@chatpack/next"))
     dependencies.push("@chatpack/next");
   if (client && !dependencyExists(inspection, "@chatpack/client"))
@@ -378,19 +407,27 @@ export async function makePlan(inspection: ProjectInspection, args: CliArgs): Pr
     warnings.push(
       "Memory storage loses data on process restart and is not suitable for serverless production.",
     );
-  if (adapter === "drizzle") {
+  if (adapter === "drizzle" || adapter === "sqlite" || adapter === "turso") {
     const schema = schemaPath(inspection.sourceRoot, language);
     if (
       !inspection.files.some((file) => /chatpack\.schema\.[cm]?[jt]sx?$/.test(file.relativePath))
     ) {
       actions.push(
-        actionForFile(schema, renderSchema(), "Create the Chatpack Drizzle schema export."),
+        actionForFile(
+          schema,
+          renderSchema(adapter),
+          `Create the Chatpack ${adapter === "drizzle" ? "Drizzle" : adapter} schema export.`,
+        ),
       );
       warnings.push(
         "Add the generated Chatpack schema module to your Drizzle configuration and run your normal migration command.",
       );
     }
   }
+  if (adapter === "supabase")
+    warnings.push(
+      "Apply the @chatpack/adapter-supabase Supabase migration before using the generated server.",
+    );
   if (!auth && !inspection.chatpackConfig)
     warnings.push(
       "Connect resolveChatpackUser before using the API; the placeholder returns null and requests receive 401.",

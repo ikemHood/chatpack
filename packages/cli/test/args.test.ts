@@ -28,6 +28,10 @@ describe("CLI arguments", () => {
     });
   });
 
+  it.each(["sqlite", "turso", "supabase"] as const)("parses the %s adapter", (adapter) => {
+    expect(parseArgs(["init", "--adapter", adapter]).adapter).toBe(adapter);
+  });
+
   it("rejects incomplete resolver and database options", () => {
     expect(() => parseArgs(["init", "--auth-path", "src/auth.ts"])).toThrow(
       "--auth-path requires --auth-export",
@@ -58,5 +62,6 @@ describe("CLI arguments", () => {
 
   it("documents the web framework option", () => {
     expect(usage()).toContain("--framework <next|hono|express|web>");
+    expect(usage()).toContain("--adapter <memory|drizzle|sqlite|turso|supabase>");
   });
 });

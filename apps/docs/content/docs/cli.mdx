@@ -110,6 +110,24 @@ npx @chatpack/cli init \
   --yes
 ```
 
+Existing applications can also use SQLite, Turso/libSQL, or server-side
+Supabase storage. All use the caller-created module supplied with
+`--db-path` and `--db-export`:
+
+```sh
+npx @chatpack/cli init \
+  --framework next \
+  --adapter supabase \
+  --db-path src/lib/supabase.ts \
+  --db-export supabase \
+  --package-manager pnpm \
+  --yes
+```
+
+SQLite and Turso also receive a generated Drizzle schema re-export. Supabase
+requires its package migration before the generated server handles requests.
+Complete starters currently use Neon/Drizzle and reject other adapters.
+
 Use `--dry-run` to inspect the plan without changing the project.
 
 ## Authentication

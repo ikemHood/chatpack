@@ -153,4 +153,44 @@ describe("project planning", () => {
       ),
     ).toBe(true);
   });
+
+  it.each(["drizzle", "sqlite", "turso", "supabase"] as const)(
+    "plans %s adapter installation and generation",
+    async (adapter) => {
+      const root = await project(
+        { dependencies: { next: "latest" } },
+        { "src/lib/db.ts": "export const db = {};\n" },
+      );
+      const plan = await makePlan(inspectProject(root), {
+        ...baseArgs(root, "next"),
+        adapter,
+        dbPath: "src/lib/db.ts",
+        dbExport: "db",
+      });
+      const server = plan.actions.find((action) => action.path?.endsWith("chatpack.server.ts"));
+      expect(plan.actions.find((action) => action.kind === "install")?.command).toContain(
+        `@chatpack/adapter-${adapter}`,
+      );
+      expect(server?.content).toContain(`@chatpack/adapter-${adapter}`);
+      expect(server?.content).toContain(`${adapter}Adapter(db)`);
+      if (adapter === "supabase") {
+        expect(plan.actions.some((action) => action.path?.includes("chatpack.schema"))).toBe(false);
+        expect(plan.warnings).toContain(
+          "Apply the @chatpack/adapter-supabase Supabase migration before using the generated server.",
+        );
+      } else {
+        expect(
+          plan.actions.find((action) => action.path?.includes("chatpack.schema"))?.content,
+        ).toContain(`@chatpack/adapter-${adapter}`);
+      }
+    },
+  );
+
+  it("rejects non-Drizzle adapters for complete starters", async () => {
+    const root = await mkdtemp(join(tmpdir(), "chatpack-cli-starter-"));
+    tempProjects.push(root);
+    await expect(
+      makePlan(inspectProject(root), { ...baseArgs(root, "next"), adapter: "turso" }),
+    ).rejects.toThrow("Starter projects currently require --adapter drizzle.");
+  });
 });
